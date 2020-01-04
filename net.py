@@ -24,7 +24,8 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, x):
-        x = x.flatten()
+        # x = x.flatten()
+        x = x.view(-1, 784)
         return self.discriminator(x)
 
 
@@ -60,15 +61,21 @@ def real_loss(D_out, smooth=False):
     else:
         labels = torch.ones(batch_size)
 
-    criterion = nn.BCEWithLogitLoss()
-    loss = criterion(D_out.squeeze, labels)
+    if torch.cuda.is_available():
+        labels = labels.cuda()
+
+    criterion = nn.BCEWithLogitsLoss()
+    loss = criterion(D_out.squeeze(), labels)
     return loss
 
 def fake_loss(D_out):
     batch_size = D_out.size(0)
     labels = torch.zeros(batch_size)
 
-    criterion = nn.BCEWithLogitLoss()
+    if torch.cuda.is_available():
+        labels = labels.cuda()
+        
+    criterion = nn.BCEWithLogitsLoss()
     loss = criterion(D_out.squeeze(), labels)
     return loss
 

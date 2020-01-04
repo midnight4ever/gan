@@ -1,13 +1,14 @@
-# import wandb
-# wandb.init(project='gan')
+import wandb
+wandb.init(project='gan')
 import torch, torch.optim as optim
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import numpy as np
 
 from net import Generator, Discriminator, real_loss, fake_loss
 
-def dataloader(batch_size=1):
+def datamaker(batch_size=1):
     train_dataset = datasets.MNIST(root='dataset', 
                                 train=True, 
                                 transform=transforms.ToTensor(),
@@ -15,23 +16,27 @@ def dataloader(batch_size=1):
 
     train_loader = torch.utils.data.DataLoader(train_dataset, 
                                             batch_size=batch_size,
-                                            num_workers=0)
+                                            num_workers=2)
+
+    return train_loader
 
 def train(batch_size=1, latent_size=100, learning_rate=2e-3, num_epochs=100):
-    dataloader = dataloader(batch_size=batch_size)
     cuda = torch.cuda.is_available()
     device = 'cuda:0' if cuda else 'cpu'
+    dataloader = datamaker(batch_size=batch_size)
+    fixed_img = np.random.uniform(-1, 1, size=(batch_size, latent_size))
+    fixed_img = torch.from_numpy(fixed_img).float()
     gen_imgs = []
 
     G = Generator(input_size=latent_size)
     D = Discriminator()
     if cuda:
         print('Using CUDA')
+        fixed_img = fixed_img.cuda()
         G.cuda()
         D.cuda()
+        
 
-    fixed_img = np.random.uniform(-1, 1, size=(batch_size, latent_size))
-    fixed_img = torch.from_numpy(fixed_img).float()
 
     g_optimizer = optim.Adam(G.parameters(), lr=learning_rate)
     d_optimizer = optim.Adam(D.parameters(), lr=learning_rate)
@@ -56,6 +61,8 @@ def train(batch_size=1, latent_size=100, learning_rate=2e-3, num_epochs=100):
                     # generate fake images from latent vector
                     latent_vector = np.random.uniform(-1, 1, size=(batch_size, latent_size))
                     latent_vector = torch.from_numpy(latent_vector).float()
+                    if cuda:
+                        latent_vector = latent_vector.cuda()
                     fake_images = G(latent_vector)
 
                     # compute discriminator loss on real images
@@ -78,6 +85,8 @@ def train(batch_size=1, latent_size=100, learning_rate=2e-3, num_epochs=100):
                 if phase == 'generator':
                     latent_vector = np.random.uniform(-1, 1, size=(batch_size, latent_size))
                     latent_vector = torch.from_numpy(latent_vector).float()
+                    if cuda:
+                      latent_vector = latent_vector.cuda()
                     fake_images = G(latent_vector)
                     
                     g_optimizer.zero_grad()
@@ -89,6 +98,7 @@ def train(batch_size=1, latent_size=100, learning_rate=2e-3, num_epochs=100):
                     g_optimizer.step()
 
             if idx % 100 == 0: 
+                pass
                 wandb.log({ 'G Loss': g_loss_value, 'D Loss': d_loss_value })
         wandb.log({ 'G Epoch Loss': g_loss_value, 'D Epoch Loss': d_loss_value }, step=epoch)
         
@@ -111,4 +121,4 @@ if __name__ == '__main__':
     # plt.imshow(images)
     # plt.show()
 
-    train()
+    train(batch_size=128)
